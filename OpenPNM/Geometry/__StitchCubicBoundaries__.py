@@ -6,24 +6,16 @@ Created on Mon Oct 28 20:29:06 2013
 """
 
 import OpenPNM
-import scipy as sp
-import numpy as np
-import scipy.stats as spst
-import scipy.spatial as sptl
-import itertools as itr
-import math
-
 from __GenericGeometry__ import GenericGeometry
 
 class CubicBoundaries(GenericGeometry):
      def __init__(self, **kwargs):
-
-        super(StitchCubicBoundaries,self).__init__(**kwargs)
-        self._logger.debug("Execute constructor")
-
-        #Instantiate pore network object
+        super(CubicBoundaries,self).__init__(**kwargs)
         self._net=OpenPNM.Network.GenericNetwork()
+     
+     def _generate(self):
+        self._logger.debug("Execute RunBoundaryStitch")    
         
-    def generate(self, network, **params):
-        self._logger.debug("Execute RunBoundaryStitch")
-        
+
+if __name__ == '__main__':
+    test=CubicBoundaries(loggername='TestCubicBoundaries')

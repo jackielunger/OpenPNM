@@ -54,14 +54,16 @@ class Stitch(GenericGeometry):
         
     def _stitch_throats(self, net1, net2):
         
-        #self._net.throat_properties['connections']
-        #self._net.throat_properties['type']
+        
         net2.throat_properties['numbering'] = len(net1.throat_properties['numbering']) + net2.throat_properties['numbering']
         self._net.throat_properties['numbering'] = sp.concatenate((net1.throat_properties['numbering'],net2.throat_properties['numbering']),axis=0)
         self._net.throat_properties['seed']      = sp.concatenate((net1.throat_properties['seed'],net2.throat_properties['seed']),axis=0)
         self._net.throat_properties['diameter']  = sp.concatenate((net1.throat_properties['diameter'],net2.throat_properties['diameter']),axis=0)
         self._net.throat_properties['volume']    = sp.concatenate((net1.throat_properties['volume'],net2.throat_properties['volume']),axis=0)
         self._net.throat_properties['length']    = sp.concatenate((net1.throat_properties['length'],net2.throat_properties['length']),axis=0)
+        #self._net.throat_properties['type']
+        #self._net.throat_properties['connections']
+        
         #Type and connections not concatenated.
         
         

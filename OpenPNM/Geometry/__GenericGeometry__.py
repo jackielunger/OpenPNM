@@ -290,4 +290,3 @@ class GenericGeometry(OpenPNM.Utilities.OpenPNMbase):
 
 if __name__ == '__main__':
     test=GenericGeometry(loggername="TestGenerator")
-
