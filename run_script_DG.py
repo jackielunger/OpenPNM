@@ -8,7 +8,7 @@ Created on Thu Sep 26 15:35:56 2013
 import OpenPNM
 
 # Parameters unique to all matricies.
-Nx = 10
+Nx = 1
 Ny = 10
 Nz = 10
 
@@ -33,10 +33,12 @@ pn1 = OpenPNM.Geometry.Cubic().generate(**network_main)
 #pn2 = OpenPNM.Geometry.Cubic().generate(**network_main)
 
 #Add boundaries to the networks
-OpenPNM.Geometry.Cubic().generate_boundaries(pn1,**network_main)
+#OpenPNM.Geometry.Cubic().generate_boundaries(pn1,**network_main)
 
 #Stitch the networks
 #OpenPNM.Geometry.Cubic().stitch_network(pn1,pn2,stitch_side = 'top') # can be stitched to top, bottom, left right etc.
+
+OpenPNM.Visualization.VTK().write(pn1)
 
 
 #DIAMETERS AND VOLUMES -- > PUSH
