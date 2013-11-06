@@ -26,7 +26,7 @@ network_main = {
 'divisions'             : [Nx,Ny,Nz]
 }
 
-OpenPNM.Geometry.CubicStithc()
+OpenPNM.Geometry.GenericGeometry.
 # Parameters specific to individual matricies.
 
 #Generate the main pore networks.
