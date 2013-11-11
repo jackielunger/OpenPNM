@@ -6,9 +6,9 @@ Created on Mon Oct 28 20:29:06 2013
 """
 
 import OpenPNM
-from __GenericGeometry__ import GenericGeometry
+from __Stitch__ import Stitch
 
-class CubicBoundaries(GenericGeometry):
+class CubicBoundaries(Stitch):
      def __init__(self, **kwargs):
         super(CubicBoundaries,self).__init__(**kwargs)
         self._net=OpenPNM.Network.GenericNetwork()

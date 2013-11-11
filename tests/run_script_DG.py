@@ -8,7 +8,7 @@ Created on Thu Sep 26 15:35:56 2013
 import OpenPNM
 
 # Parameters unique to all matricies.
-Nx = 1
+Nx = 10
 Ny = 10
 Nz = 10
 
@@ -26,11 +26,10 @@ network_main = {
 'divisions'             : [Nx,Ny,Nz]
 }
 
-OpenPNM.Geometry.GenericGeometry.
 # Parameters specific to individual matricies.
 
 #Generate the main pore networks.
-#pn1 = OpenPNM.Geometry.Cubic().generate(**network_main)
+pn1 = OpenPNM.Geometry.Cubic().generate(**network_main)
 #pn2 = OpenPNM.Geometry.Cubic().generate(**network_main)
 
 #Add boundaries to the networks
