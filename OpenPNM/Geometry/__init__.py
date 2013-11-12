@@ -24,6 +24,12 @@ Classes
    :private-members:
    :show-inheritance:
 
+.. autoclass:: Stitch
+   :members:
+   :undoc-members:
+   :private-members:
+   :show-inheritance:
+
 .. autoclass:: Delaunay
    :members:
    :undoc-members:
@@ -40,6 +46,7 @@ Classes
 
 from __GenericGeometry__ import GenericGeometry
 from __Cubic__ import Cubic
+from __Stitch__ import Stitch
 from __Delaunay__ import Delaunay
 from __Template__ import Template
 from __Import__ import MatFile

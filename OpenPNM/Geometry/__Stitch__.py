@@ -7,19 +7,25 @@ Created on Mon Oct 28 20:28:29 2013
 
 import OpenPNM
 import scipy as sp
+import numpy as np
+import itertools as itr
+import scipy.spatial as sptl
 
 from __Cubic__ import Cubic
-from __GenericGeometry import GenericGeometry
+#from __GenericGeometry__ import GenericGeometry
 
-class Stitch(GenericGeometry, Cubic): # Multiple inheritance. The functions will be searched for in Generic before Cubic. 
+class Stitch( Cubic): # Multiple inheritance. The functions will be searched for in Generic before Cubic. 
+    r"""
+
+    The point of creating an extra class here is so that we don't have to overwrite self properties within the Cubic Class. 
+    We will be able to fill in attributes of a network for each boundary to an instance of each boundary network.
+
+    """
 
     def __init__(self, **kwargs):
 
         super(Stitch,self).__init__(**kwargs)
         self._logger.debug("Execute constructor")
-
-        #Instantiate pore network object
-        self._net=OpenPNM.Network.GenericNetwork()
     
     @staticmethod
     def StitchNetworks(self, net1, net2):
@@ -45,16 +51,20 @@ class Stitch(GenericGeometry, Cubic): # Multiple inheritance. The functions will
         We must add a new list of seeds to the throats somehow ?? 
 
         """
+        print net1
+        print net2
+        
         self._logger.debug("Stitch Networks : Not Implemented Yet")
         
-    @staticmethod
-    def StitchBoundaries(self, net, **params):
+    def StitchBoundaries(self, net_original, **params):
         r"""
-        - Enstantiate 6 NEW cubic networks. (How??)
+
+        - Instantiate 6 NEW cubic networks. (How??)
         - Generate 6 new networks with these generated properties, as called by generate in the Generic class .
             - Generate _generate_setup  (Cubic)             [ Gives Nx, Ny, Nz, Lx, Ly, Lz, Lc]
-            - Generate NEW pores through translation.       [ Gives Coords, Numbering, Type in the pore_properties dictionary ]
-                - Using translate_coordinates, we will move the pores by Lc in the appropriate direction.
+            - Generate NEW pores through translation.       [ Gives Coords, Numbering, Type in the pore_properties dictionary]
+                - Using translate_coordinates, we will move 
+                the pores by Lc in the appropriate direction.
             - Generate pore seeds       (GenericGeometry)   [ Gives Seeds in pore_properties dictionary]
             - Generate pore_diameters   (GenericGeometry)   [ Gives diameter in pore_properties dictionary]
             - Generate pore_volumes     (GenericGeometry)   [ Gives volume in pore_properties dictionary]
@@ -71,19 +81,119 @@ class Stitch(GenericGeometry, Cubic): # Multiple inheritance. The functions will
         - We now have a full network (one out of the 6) fully defined. We should now called StitchNetworks to connect pore and throat properties.
 
         """
-        #Instantiate pore network object. PUT THIS IN A LOOP IN THE FUTURE.
-        self._net_bound_1 = OpenPNM.Network.GenericNetwork()
-        self._net_bound_2 = OpenPNM.Network.GenericNetwork()
-        self._net_bound_3 = OpenPNM.Network.GenericNetwork()
-        self._net_bound_4 = OpenPNM.Network.GenericNetwork()
-        self._net_bound_5 = OpenPNM.Network.GenericNetwork()
-        self._net_bound_6 = OpenPNM.Network.GenericNetwork()
 
+        #Instantiate pore network object 6 times for each edge in a loop.
+        
+        for i in range(6):
+            self._net = OpenPNM.Network.GenericNetwork()
+            self._net_original = net_original
+            self._generate_setup(**params)              # We now have Nx, Ny, Nz, Lx, Ly, Lz, Lc
+            
+            divisions = [self._Nx, self._Ny, self._Nz]  # We figure out which face to create. This part extracts a single face.
+            divisions[i%3] = 1
+            self._Nx = divisions[0]
+            self._Ny = divisions[1]
+            self._Nz = divisions[2]
 
+            trans  = [0,0,0]                                        # This network is properly displaced and then translated.
+            coords = self._net_original.pore_properties['coords']
 
+            if i < 3:
+                trans[i%3] = (coords[:,i%3].max() + 0.5*self._Lc)         # Maximum x,y,z translations.
+            else:
+                trans[i%3] = (coords[:,i%3].min() + 0.5*self._Lc) * -1    # Minimum x,y,z translations
+    
+    
+            self._generate_pores()                     
+            self.translate_coordinates(self._net, displacement = trans )
+            self._net.pore_properties['type'] = np.repeat(i+1,len(self._net.pore_properties['coords']))
+            self._generate_pore_seeds()                         
+            self._generate_pore_diameters(params['psd_info'])   
+            self._calc_pore_volumes()                           
+            self._stitch_pores( net1 = self._net_original, net2 = self._net)    # Stitch all new pore properties into net_original.
+    
+                                            # Dependent pore information now stored in net_original. Now we can get throat information. 
+            self._generate_new_throats()    # This should give us throat connections, numbering, and type for the full matrix with Delaunay
+            self._generate_throat_seeds()
+            self._generate_throat_diameters(params['tsd_info'])
+            self._calc_throat_lengths()
+            self._calc_throat_volumes()
+            self._set_throat_types()
+            
+            net_original = self._net
 
+        self._refine_boundary_throats()            
+        return self._net
+    
+    def _set_throat_types(self):
+        r"""
+        """
+        for i in range(0,len(self._net.throat_properties['type'])):
+            temp1 = self._net.pore_properties['type'][self._net.throat_properties['connections'][i,0]]
+            temp2 = self._net.pore_properties['type'][self._net.throat_properties['connections'][i,1]]
+            if min(temp1,temp2) > 0:
+                self._net.throat_properties['type'][i] = min(temp1,temp2)
+        
+    def _refine_boundary_throats(self):
+        mask = np.where(self._net.throat_properties['type'] == 0)
+        self._net.throat_properties['volume']       = self._net.throat_properties['volume'][mask]
+        self._net.throat_properties['diameter']     = self._net.throat_properties['diameter'][mask]
+        self._net.throat_properties['numbering']    = self._net.throat_properties['numbering'][mask]
+        self._net.throat_properties['connections']  = self._net.throat_properties['connections'][mask]
+        self._net.throat_properties['length']       = self._net.throat_properties['length'][mask]
+        self._net.throat_properties['seed']         = self._net.throat_properties['seed'][mask]
+        self._net.throat_properties['type']         = self._net.throat_properties['type'][mask]
+        
+    
+    def _generate_new_throats(self):
+        r"""
+        Stitch two networks together OR adds the boundary throats to an existing network
+    
+        Parameters
+        ----------
+        net : OpenPNM Network Object
+            The network that is stiched, whos throats are being added.
+    
+        """
+        pts = self._net.pore_properties['coords']
+        tri = sptl.Delaunay(pts)
+        I = []
+        J = []
+        V = []
+    
+        dist_comb = list(itr.combinations(range(4),2)) # [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]. This compares each colony with its neighbor with no repeats.
+    
+        for i in range(len(tri.simplices)):
+            for j in range(len(dist_comb)):
+                point_1 = tri.simplices[i,dist_comb[j][0]]
+                point_2 = tri.simplices[i,dist_comb[j][1]]
+                coords_1 = tri.points[point_1]
+                coords_2 = tri.points[point_2]
+                dist =  np.sqrt((coords_2[0] - coords_1[0]) ** 2 + (coords_2[1] - coords_1[1]) ** 2 + (coords_2[2] - coords_1[2]) ** 2)
+                V.append(dist)
+                I.append(point_1)
+                J.append(point_2)
+    
+                    # Takes all the IJV values and puts it into a sparse matrix.
+        spar_connections = sp.sparse.coo_matrix((np.array(V),(np.array(I),np.array(J))))
+        ind = np.where(spar_connections.data < min(spar_connections.data) + 0.001)
+        prelim_connections = np.array((spar_connections.row[ind],spar_connections.col[ind]))
+        connections = np.zeros((len(prelim_connections[0]),2),np.int)
+    
+        for i in range(len(prelim_connections[0])):
+            connections[i,0] = prelim_connections[0][i]
+            connections[i,1] = prelim_connections[1][i]
+    
+        b = np.ascontiguousarray(connections).view(np.dtype((np.void, connections.dtype.itemsize * connections.shape[1])))
+        _, idx = np.unique(b, return_index=True) # TAKEN FROM STACK OVERFLOW FOR THE TIME BEING.
+        connections = connections[idx]
+    
+        self._net.throat_properties['connections'] =  connections
+        self._net.throat_properties['numbering'] = np.arange(0,len(connections[:,0]))
+        self._net.throat_properties['type'] = np.zeros(len(connections[:,0]),dtype=np.int8)
+        
+        
     def _stitch_pores(self, net1, net2):
-
 
         self._net.pore_properties['coords']      = sp.concatenate((net1.pore_properties['coords'],net2.pore_properties['coords']),axis = 0)
         net2.pore_properties['numbering']        = len(net1.pore_properties['numbering']) + net2.pore_properties['numbering']
@@ -93,17 +203,17 @@ class Stitch(GenericGeometry, Cubic): # Multiple inheritance. The functions will
         self._net.pore_properties['diameter']    = sp.concatenate((net1.pore_properties['diameter'],net2.pore_properties['diameter']),axis = 0)
         self._net.pore_properties['volume']      = sp.concatenate((net1.pore_properties['volume'],net2.pore_properties['volume']),axis = 0)
 
-
         
     def _stitch_throats(self, net1, net2):
         
+        net = OpenPNM.Network.GenericNetwork()
         
-        net2.throat_properties['numbering']      = len(net1.throat_properties['numbering']) + net2.throat_properties['numbering']
-        self._net.throat_properties['numbering'] = sp.concatenate((net1.throat_properties['numbering'],net2.throat_properties['numbering']),axis=0)
-        self._net.throat_properties['seed']      = sp.concatenate((net1.throat_properties['seed'],net2.throat_properties['seed']),axis=0)
-        self._net.throat_properties['diameter']  = sp.concatenate((net1.throat_properties['diameter'],net2.throat_properties['diameter']),axis=0)
-        self._net.throat_properties['volume']    = sp.concatenate((net1.throat_properties['volume'],net2.throat_properties['volume']),axis=0)
-        self._net.throat_properties['length']    = sp.concatenate((net1.throat_properties['length'],net2.throat_properties['length']),axis=0)
+        net2.throat_properties['numbering']= len(net1.throat_properties['numbering']) + net2.throat_properties['numbering']
+        net.throat_properties['numbering'] = sp.concatenate((net1.throat_properties['numbering'],net2.throat_properties['numbering']),axis=0)
+        net.throat_properties['seed']      = sp.concatenate((net1.throat_properties['seed'],net2.throat_properties['seed']),axis=0)
+        net.throat_properties['diameter']  = sp.concatenate((net1.throat_properties['diameter'],net2.throat_properties['diameter']),axis=0)
+        net.throat_properties['volume']    = sp.concatenate((net1.throat_properties['volume'],net2.throat_properties['volume']),axis=0)
+        net.throat_properties['length']    = sp.concatenate((net1.throat_properties['length'],net2.throat_properties['length']),axis=0)
         #self._net.throat_properties['type']
         #self._net.throat_properties['connections']
         
@@ -111,8 +221,7 @@ class Stitch(GenericGeometry, Cubic): # Multiple inheritance. The functions will
         #Check that the types and connections are correct with VTK. 
         
         
-    @staticmethod
-    def translate_coordinates(self,net,displacement=[0,0,0]):
+    def _translate_coordinates(self,net,displacement=[0,0,0]):
         r"""
         Translate pore network coordinates by specified amount
 
@@ -142,3 +251,6 @@ class Stitch(GenericGeometry, Cubic): # Multiple inheritance. The functions will
 
         """
         net.pore_properties['coords'] = net.pore_properties['coords']*scale
+
+if __name__ == '__main__':
+    test=Stitch(loggername='TestStitch')
