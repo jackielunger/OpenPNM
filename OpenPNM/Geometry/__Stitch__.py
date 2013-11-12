@@ -28,7 +28,7 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         self._logger.debug("Execute constructor")
     
     @staticmethod
-    def StitchNetworks(self, net1, net2):
+    def StitchNetworks(self, net1, net2, **params):
         r"""
         Stitch two networks together. User will translate or scale beforehand. 
 
@@ -51,8 +51,14 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         We must add a new list of seeds to the throats somehow ?? 
 
         """
-        print net1
-        print net2
+        self._net = OpenPNM.Network.GenericNetwork()
+        self._stitch_pores(self, net1, net2)
+        self._generate_new_throats()    # This should give us throat connections, numbering, and type for the full matrix with Delaunay
+        self._generate_throat_seeds()
+        self._generate_throat_diameters(params['tsd_info'])
+        self._calc_throat_lengths()
+        self._calc_throat_volumes()
+                                                
         
         self._logger.debug("Stitch Networks : Not Implemented Yet")
         
@@ -83,48 +89,78 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         """
 
         #Instantiate pore network object 6 times for each edge in a loop.
+        b_type = np.concatenate((params['btype'],params['btype']))
         
         for i in range(6):
             self._net = OpenPNM.Network.GenericNetwork()
             self._net_original = net_original
-            self._generate_setup(**params)              # We now have Nx, Ny, Nz, Lx, Ly, Lz, Lc
+
+            if not b_type[i]:
+                self._generate_setup(**params)              # We now have Nx, Ny, Nz, Lx, Ly, Lz, Lc
+
+                divisions = [self._Nx, self._Ny, self._Nz]  # We figure out which face to create. This part extracts a single face.
+                divisions[i%3] = 1
+                self._Nx = divisions[0]
+                self._Ny = divisions[1]
+                self._Nz = divisions[2]
+    
+                trans  = [0,0,0]                                        # This network is properly displaced and then translated.
+                coords = self._net_original.pore_properties['coords']
+    
+                if i < 3:
+                    trans[i%3] = (coords[:,i%3].max() + 0.5*self._Lc)         # Maximum x,y,z translations.
+                else:
+                    trans[i%3] = (coords[:,i%3].min() + 0.5*self._Lc) * -1    # Minimum x,y,z translations
+        
+        
+                self._generate_pores()                     
+                self.translate_coordinates(self._net, displacement = trans )
+                self._net.pore_properties['type'] = np.repeat(i+1,len(self._net.pore_properties['coords']))
+                self._generate_pore_seeds()                         
+                self._generate_pore_diameters(params['psd_info'])   
+                self._calc_pore_volumes()                           
+                
+                self._stitch_pores( net1 = self._net_original, net2 = self._net)    # Stitch all new pore properties into net_original.
+                
+                self._generate_new_throats()    # This should give us throat connections, numbering, and type for the full matrix with Delaunay
+                self._generate_throat_seeds()
+                self._generate_throat_diameters(params['tsd_info'])
+                self._calc_throat_lengths()
+                self._calc_throat_volumes()
+        
+                
+                self._set_pore_types(b_type)        # The next 3 calls are specific to boundary generation, so thats why they're outside of stitch _throats. 
+                self._set_throat_types()            # They set the correct types of pore and throat boundaries, and remove the external to external connections using refine. 
+                self._refine_boundary_throats()
+                
+            if any(self._net.pore_properties.keys()):
+                net_original = self._net
+                
+        if any(self._net.pore_properties.keys()):
+            return self._net
+        else:
+            return self._net_original
             
-            divisions = [self._Nx, self._Ny, self._Nz]  # We figure out which face to create. This part extracts a single face.
-            divisions[i%3] = 1
-            self._Nx = divisions[0]
-            self._Ny = divisions[1]
-            self._Nz = divisions[2]
+    
+    def _set_pore_types(self, b_type):
+        pore_type = np.zeros(len(self._net.pore_properties['type']))
+        coords    = self._net.pore_properties['coords']
+        t_count   = 0
 
-            trans  = [0,0,0]                                        # This network is properly displaced and then translated.
-            coords = self._net_original.pore_properties['coords']
-
-            if i < 3:
-                trans[i%3] = (coords[:,i%3].max() + 0.5*self._Lc)         # Maximum x,y,z translations.
-            else:
-                trans[i%3] = (coords[:,i%3].min() + 0.5*self._Lc) * -1    # Minimum x,y,z translations
-    
-    
-            self._generate_pores()                     
-            self.translate_coordinates(self._net, displacement = trans )
-            self._net.pore_properties['type'] = np.repeat(i+1,len(self._net.pore_properties['coords']))
-            self._generate_pore_seeds()                         
-            self._generate_pore_diameters(params['psd_info'])   
-            self._calc_pore_volumes()                           
-            self._stitch_pores( net1 = self._net_original, net2 = self._net)    # Stitch all new pore properties into net_original.
-    
-                                            # Dependent pore information now stored in net_original. Now we can get throat information. 
-            self._generate_new_throats()    # This should give us throat connections, numbering, and type for the full matrix with Delaunay
-            self._generate_throat_seeds()
-            self._generate_throat_diameters(params['tsd_info'])
-            self._calc_throat_lengths()
-            self._calc_throat_volumes()
-            self._set_throat_types()
+        for i in range(2,-1,-1):
             
-            net_original = self._net
+            if not b_type[i]:
+                bound_1 = coords[:,i].min()
+                bound_2 = coords[:,i].max()
+                bound_ind_1 = np.where(coords[:,i] == bound_1)
+                bound_ind_2 = np.where(coords[:,i] == bound_2)
+                pore_type[bound_ind_1] = 1 + t_count
+                pore_type[bound_ind_2] = 6 - t_count
+                
+            t_count = t_count + 1
+        
+        self._net.pore_properties['type'] = pore_type
 
-        self._refine_boundary_throats()            
-        return self._net
-    
     def _set_throat_types(self):
         r"""
         """
@@ -133,7 +169,7 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
             temp2 = self._net.pore_properties['type'][self._net.throat_properties['connections'][i,1]]
             if min(temp1,temp2) > 0:
                 self._net.throat_properties['type'][i] = min(temp1,temp2)
-        
+
     def _refine_boundary_throats(self):
         mask = np.where(self._net.throat_properties['type'] == 0)
         self._net.throat_properties['volume']       = self._net.throat_properties['volume'][mask]
@@ -202,24 +238,6 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         self._net.pore_properties['seed']        = sp.concatenate((net1.pore_properties['seed'],net2.pore_properties['seed']),axis = 0)
         self._net.pore_properties['diameter']    = sp.concatenate((net1.pore_properties['diameter'],net2.pore_properties['diameter']),axis = 0)
         self._net.pore_properties['volume']      = sp.concatenate((net1.pore_properties['volume'],net2.pore_properties['volume']),axis = 0)
-
-        
-    def _stitch_throats(self, net1, net2):
-        
-        net = OpenPNM.Network.GenericNetwork()
-        
-        net2.throat_properties['numbering']= len(net1.throat_properties['numbering']) + net2.throat_properties['numbering']
-        net.throat_properties['numbering'] = sp.concatenate((net1.throat_properties['numbering'],net2.throat_properties['numbering']),axis=0)
-        net.throat_properties['seed']      = sp.concatenate((net1.throat_properties['seed'],net2.throat_properties['seed']),axis=0)
-        net.throat_properties['diameter']  = sp.concatenate((net1.throat_properties['diameter'],net2.throat_properties['diameter']),axis=0)
-        net.throat_properties['volume']    = sp.concatenate((net1.throat_properties['volume'],net2.throat_properties['volume']),axis=0)
-        net.throat_properties['length']    = sp.concatenate((net1.throat_properties['length'],net2.throat_properties['length']),axis=0)
-        #self._net.throat_properties['type']
-        #self._net.throat_properties['connections']
-        
-        #Type and connections not concatenated, they must be generated using a separate script. This is where the delaunay script comes in. 
-        #Check that the types and connections are correct with VTK. 
-        
         
     def _translate_coordinates(self,net,displacement=[0,0,0]):
         r"""
