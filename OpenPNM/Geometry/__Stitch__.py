@@ -27,7 +27,7 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         super(Stitch,self).__init__(**kwargs)
         self._logger.debug("Execute constructor")
     
-    @staticmethod
+    
     def StitchNetworks(self, net1, net2, **params):
         r"""
         Stitch two networks together. User will translate or scale beforehand. 
@@ -51,16 +51,30 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         We must add a new list of seeds to the throats somehow ?? 
 
         """
-        self._net = OpenPNM.Network.GenericNetwork()
-        self._stitch_pores(self, net1, net2)
-        self._generate_new_throats()    # This should give us throat connections, numbering, and type for the full matrix with Delaunay
-        self._generate_throat_seeds()
-        self._generate_throat_diameters(params['tsd_info'])
-        self._calc_throat_lengths()
-        self._calc_throat_volumes()
-                                                
+        #############################################################################
+        # JUST FOR TEST PURPOSES. TRANSLATE COORDINATES MUST MOVE net2 BEFORE STITCH
+        self._generate_setup(**params)
+        z_trans = net2.pore_properties['coords'][:,2].max() + self._Lc/2
+        net2 = self._translate_coordinates(net2, displacement = [0,0,z_trans])
+        #############################################################################        
+
+        self._net = OpenPNM.Network.GenericNetwork()        
+        self._stitch_pores(net1, net2)      
+        self._stitch_throats(**params)  # These parameters are of the first network. They will be used to generate the new pores
+                                        # All other properties that exist from net 2 will replace the newly stitched set of throats and properties. 
+        large = len(self._net.throat_properties['type'])
+        small = len(net2.throat_properties['type'])
         
+        self._net.throat_properties['type']         = sp.zeros(large)
+        self._net.throat_properties['volume']       = sp.concatenate((self._net.throat_properties['volume'][0:large-small], net2.throat_properties['volume']))
+        self._net.throat_properties['diameter']     = sp.concatenate((self._net.throat_properties['diameter'][0:large-small], net2.throat_properties['diameter']))
+        self._net.throat_properties['numbering']    = sp.concatenate((self._net.throat_properties['numbering'][0:large-small], net2.throat_properties['numbering']))
+        self._net.throat_properties['length']       = sp.concatenate((self._net.throat_properties['length'][0:large-small], net2.throat_properties['length']))
+        self._net.throat_properties['seed']         = sp.concatenate((self._net.throat_properties['seed'][0:large-small], net2.throat_properties['seed']))
+                                                
         self._logger.debug("Stitch Networks : Not Implemented Yet")
+        return self._net
+
         
     def StitchBoundaries(self, net_original, **params):
         r"""
@@ -121,12 +135,7 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
                 self._calc_pore_volumes()                           
                 
                 self._stitch_pores( net1 = self._net_original, net2 = self._net)    # Stitch all new pore properties into net_original.
-                
-                self._generate_new_throats()    # This should give us throat connections, numbering, and type for the full matrix with Delaunay
-                self._generate_throat_seeds()
-                self._generate_throat_diameters(params['tsd_info'])
-                self._calc_throat_lengths()
-                self._calc_throat_volumes()
+                self._stitch_throats( **params )
         
                 
                 self._set_pore_types(b_type)        # The next 3 calls are specific to boundary generation, so thats why they're outside of stitch _throats. 
@@ -164,6 +173,7 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
     def _set_throat_types(self):
         r"""
         """
+        
         for i in range(0,len(self._net.throat_properties['type'])):
             temp1 = self._net.pore_properties['type'][self._net.throat_properties['connections'][i,0]]
             temp2 = self._net.pore_properties['type'][self._net.throat_properties['connections'][i,1]]
@@ -171,6 +181,9 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
                 self._net.throat_properties['type'][i] = min(temp1,temp2)
 
     def _refine_boundary_throats(self):
+        r"""
+        """
+        
         mask = np.where(self._net.throat_properties['type'] == 0)
         self._net.throat_properties['volume']       = self._net.throat_properties['volume'][mask]
         self._net.throat_properties['diameter']     = self._net.throat_properties['diameter'][mask]
@@ -191,6 +204,7 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
             The network that is stiched, whos throats are being added.
     
         """
+        
         pts = self._net.pore_properties['coords']
         tri = sptl.Delaunay(pts)
         I = []
@@ -238,6 +252,13 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         self._net.pore_properties['seed']        = sp.concatenate((net1.pore_properties['seed'],net2.pore_properties['seed']),axis = 0)
         self._net.pore_properties['diameter']    = sp.concatenate((net1.pore_properties['diameter'],net2.pore_properties['diameter']),axis = 0)
         self._net.pore_properties['volume']      = sp.concatenate((net1.pore_properties['volume'],net2.pore_properties['volume']),axis = 0)
+    
+    def _stitch_throats(self, **params):
+        self._generate_new_throats()    # This should give us throat connections, numbering, and type for the full matrix with Delaunay
+        self._generate_throat_seeds()
+        self._generate_throat_diameters(params['tsd_info'])
+        self._calc_throat_lengths()
+        self._calc_throat_volumes()
         
     def _translate_coordinates(self,net,displacement=[0,0,0]):
         r"""
@@ -253,7 +274,8 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
 
         """
         net.pore_properties['coords'] = net.pore_properties['coords'] + displacement
-
+        return net
+        
     @staticmethod
     def scale_coordinates(self,net,scale=[1,1,1]):
         r"""
