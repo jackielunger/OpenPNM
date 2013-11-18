@@ -232,6 +232,7 @@ class GenericGeometry(OpenPNM.Utilities.OpenPNMbase):
 
         """
         net.pore_properties['coords'] = net.pore_properties['coords'] + displacement
+        return net
 
     @staticmethod
     def scale_coordinates(net,scale=[1,1,1]):

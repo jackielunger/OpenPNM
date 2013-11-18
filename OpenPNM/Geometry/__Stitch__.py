@@ -53,10 +53,11 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         """
         #############################################################################
         # JUST FOR TEST PURPOSES. TRANSLATE COORDINATES MUST MOVE net2 BEFORE STITCH
-        self._generate_setup(**params)
-        z_trans = net2.pore_properties['coords'][:,2].max() + self._Lc/2
-        net2 = self._translate_coordinates(net2, displacement = [0,0,z_trans])
-        #############################################################################        
+        #self._generate_setup(**params)
+        #z_trans = net2.pore_properties['coords'][:,2].max() + self._Lc/2
+        #net2 = self._translate_coordinates(net2, displacement = [0,0,z_trans])
+        #############################################################################       
+
 
         self._net = OpenPNM.Network.GenericNetwork()        
         self._stitch_pores(net1, net2)      
@@ -107,7 +108,7 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         
         for i in range(6):
             self._net = OpenPNM.Network.GenericNetwork()
-            self._net_original = net_original
+            self._net_original = net_original # without boundaries. 
 
             if not b_type[i]:
                 self._generate_setup(**params)              # We now have Nx, Ny, Nz, Lx, Ly, Lz, Lc
@@ -128,7 +129,7 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         
         
                 self._generate_pores()                     
-                self.translate_coordinates(self._net, displacement = trans )
+                self._net = super(Stitch,self).translate_coordinates(self._net,displacement = trans)
                 self._net.pore_properties['type'] = np.repeat(i+1,len(self._net.pore_properties['coords']))
                 self._generate_pore_seeds()                         
                 self._generate_pore_diameters(params['psd_info'])   
@@ -259,8 +260,9 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         self._generate_throat_diameters(params['tsd_info'])
         self._calc_throat_lengths()
         self._calc_throat_volumes()
-        
-    def _translate_coordinates(self,net,displacement=[0,0,0]):
+    
+    @staticmethod
+    def translate_coordinates(self,net,displacement=[0,0,0]):
         r"""
         Translate pore network coordinates by specified amount
 
