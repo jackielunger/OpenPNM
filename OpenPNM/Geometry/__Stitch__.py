@@ -52,7 +52,7 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
 
         """
         #############################################################################
-        # JUST FOR TEST PURPOSES. TRANSLATE COORDINATES MUST MOVE net2 BEFORE STITCH
+        # JUST FOR TEST PURPOSES. TRANSLATE COORDINATES MUST MOVE net2 BEFORE STITCH IS CALLED IN THE SCRIPT.
         self._generate_setup(**params)
         z_trans = net2.pore_properties['coords'][:,2].max() + self._Lc/2
         net2 = super(Cubic,self).translate_coordinates(net2, displacement = [0,0,z_trans])
@@ -76,8 +76,9 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         self._logger.debug("Stitch Networks : Not Implemented Yet")
         return self._net
 
+
+    def StitchBoundaries(self, net_original, **params):
         
-    def StitchBoundariesV1(self, net_original, **params):
         r"""
 
         - Instantiate 6 NEW cubic networks. (How??)
@@ -103,70 +104,6 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
 
         """
 
-        #Instantiate pore network object 6 times for each edge in a loop.
-        b_type = np.concatenate((params['btype'],params['btype']))
-        
-        for i in range(6):
-            self._net = OpenPNM.Network.GenericNetwork()
-            self._net_original = net_original # without boundaries. 
-            coords = self._net_original.pore_properties['coords']
-            
-            if not b_type[i]:
-                self._generate_setup(**params)              # We now have Nx, Ny, Nz, Lx, Ly, Lz, Lc
-                
-                #dim_1 = np.where(coords[:,0] == coords[:,0].max())
-                #dim_2 = np.where(coords[:,1] == coords[:,1].max())
-                #dim_3 = np.where(coords[:,2] == coords[:,2].max())
-                #divisions = [len(dim_1[0]), len(dim_2[0]), len(dim_3[0])]  # We figure out which face to create. This part extracts a single face.
-                
-                divisions =  [ self._Nx, self._Ny, self._Nz ]                
-
-                divisions[i%3] = 1                  
-                self._Nx = divisions[0]
-                self._Ny = divisions[1]
-                self._Nz = divisions[2]
-    
-                trans  = [0,0,0]                                        # This network is properly displaced and then translated.
-                if i < 3:
-                    trans[i%3] = (coords[:,i%3].max() + 0.5*self._Lc)         # Maximum x,y,z translations.
-                else:
-                    trans[i%3] = (coords[:,i%3].min() + 0.5*self._Lc) * -1    # Minimum x,y,z translations
-        
-        
-                self._generate_pores()                     
-                self._net = super(Stitch,self).translate_coordinates(self._net,displacement = trans)
-                self._net.pore_properties['type'] = np.repeat(i+1,len(self._net.pore_properties['coords']))
-                self._generate_pore_seeds()                         
-                self._generate_pore_diameters(params['psd_info'])   
-                self._calc_pore_volumes()                           
-                
-                self._stitch_pores( net1 = self._net_original, net2 = self._net)    # Stitch all new pore properties into net_original.
-                self._stitch_throats( **params )
-        
-                
-                self._set_pore_types(b_type)        # The next 3 calls are specific to boundary generation, so thats why they're outside of stitch _throats. 
-                self._set_throat_types()            # They set the correct types of pore and throat boundaries, and remove the external to external connections using refine. 
-                self._refine_boundary_throats()
-                
-            if any(self._net.pore_properties.keys()):
-                net_original = self._net
-                
-        if any(self._net.pore_properties.keys()):
-            return self._net
-        else:
-            return self._net_original
-
-
-
-
-
-
-
-
-
-
-    def StitchBoundariesV2(self, net_original, **params):
-        
         btype = params['btype']
         btype_ind = np.where(np.array(btype)==0)
         
@@ -178,13 +115,11 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
             neighbor_coords = self._net_original.get_neighbor_pores(i)
             
             if len(neighbor_coords) != 6:
-                
                 for j in range(0,len(btype_ind[0])): # Maximum of 3 iterations.
                 
                     periodic = btype_ind[0][j]
                     neighbor_ind = coords[neighbor_coords,periodic]
                     current_ind = coords[i][periodic]
-                    
                     border = np.where(neighbor_ind != current_ind)[0]
                     
                     if len(border) != 2:
@@ -206,20 +141,6 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         self._refine_boundary_throats()
         return self._net
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
             
     def _set_pore_types(self, b_type):
         pore_type = np.zeros(len(self._net.pore_properties['type']))
@@ -227,7 +148,6 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         t_count   = 0
 
         for i in range(2,-1,-1):
-            
             if not b_type[i]:
                 bound_1 = coords[:,i].min()
                 bound_2 = coords[:,i].max()
@@ -235,7 +155,6 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
                 bound_ind_2 = np.where(coords[:,i] == bound_2)
                 pore_type[bound_ind_1] = 1 + t_count
                 pore_type[bound_ind_2] = 6 - t_count
-                
             t_count = t_count + 1
         
         self._net.pore_properties['type'] = pore_type
@@ -324,6 +243,7 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         self._net.pore_properties['volume']      = sp.concatenate((net1.pore_properties['volume'],net2.pore_properties['volume']),axis = 0)
     
     def _stitch_throats(self, **params):
+        
         self._generate_new_throats()    # This should give us throat connections, numbering, and type for the full matrix with Delaunay
         self._generate_throat_seeds()
         self._generate_throat_diameters(params['tsd_info'])
