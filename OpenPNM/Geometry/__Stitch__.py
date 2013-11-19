@@ -12,10 +12,10 @@ import itertools as itr
 import scipy.spatial as sptl
 import scipy.sparse as sprs
 
-from __Cubic__ import Cubic
+from __GenericGeometry__ import GenericGeometry
 #from __GenericGeometry__ import GenericGeometry
 
-class Stitch( Cubic): # Multiple inheritance. The functions will be searched for in Generic before Cubic. 
+class Stitch( GenericGeometry): # Multiple inheritance. The functions will be searched for in Generic before Cubic. 
     r"""
 
     The point of creating an extra class here is so that we don't have to overwrite self properties within the Cubic Class. 
@@ -52,13 +52,6 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         We must add a new list of seeds to the throats somehow ?? 
 
         """
-        #############################################################################
-        # JUST FOR TEST PURPOSES. TRANSLATE COORDINATES MUST MOVE net2 BEFORE STITCH IS CALLED IN THE SCRIPT.
-        self._generate_setup(**params)
-        z_trans = net2.pore_properties['coords'][:,2].max() + self._Lc/2
-        net2 = super(Cubic,self).translate_coordinates(net2, displacement = [0,0,z_trans])
-        #############################################################################       
-
 
         self._net = OpenPNM.Network.GenericNetwork()        
         self._stitch_pores(net1, net2)      
@@ -134,7 +127,7 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         self._net.pore_properties['type']= np.zeros(len(coords),dtype=np.int8)
         self._generate_pore_seeds()                         
         self._generate_pore_diameters(params['psd_info'])   
-        self._calc_pore_volumes() 
+        self._calc_pore_volumes()
         
         self._stitch_throats( **params )
         self._set_pore_types(btype)        # The next 3 calls are specific to boundary generation, so thats why they're outside of stitch _throats. 
