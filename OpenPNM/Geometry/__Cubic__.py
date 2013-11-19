@@ -9,10 +9,7 @@ module __Cubic__: Generate simple cubic networks
 import OpenPNM
 import scipy as sp
 import numpy as np
-import scipy.stats as spst
-import scipy.spatial as sptl
-import itertools as itr
-import math
+
 #Test
 
 from __GenericGeometry__ import GenericGeometry

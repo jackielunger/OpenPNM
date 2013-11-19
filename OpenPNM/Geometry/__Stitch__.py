@@ -10,6 +10,7 @@ import scipy as sp
 import numpy as np
 import itertools as itr
 import scipy.spatial as sptl
+import scipy.sparse as sprs
 
 from __Cubic__ import Cubic
 #from __GenericGeometry__ import GenericGeometry
@@ -182,56 +183,30 @@ class Stitch( Cubic): # Multiple inheritance. The functions will be searched for
         self._net.throat_properties['seed']         = self._net.throat_properties['seed'][mask]
         self._net.throat_properties['type']         = self._net.throat_properties['type'][mask]
         
-    
-    def _generate_new_throats(self):
-        r"""
-        Stitch two networks together OR adds the boundary throats to an existing network
-    
-        Parameters
-        ----------
-        net : OpenPNM Network Object
-            The network that is stiched, whos throats are being added.
-    
-        """
+    def _generate_new_throats (self):
         
         pts = self._net.pore_properties['coords']
         tri = sptl.Delaunay(pts)
-        I = []
-        J = []
-        V = []
-    
-        dist_comb = list(itr.combinations(range(4),2)) # [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]. This compares each colony with its neighbor with no repeats.
-    
-        for i in range(len(tri.simplices)):
-            for j in range(len(dist_comb)):
-                point_1 = tri.simplices[i,dist_comb[j][0]]
-                point_2 = tri.simplices[i,dist_comb[j][1]]
-                coords_1 = tri.points[point_1]
-                coords_2 = tri.points[point_2]
-                dist =  np.sqrt((coords_2[0] - coords_1[0]) ** 2 + (coords_2[1] - coords_1[1]) ** 2 + (coords_2[2] - coords_1[2]) ** 2)
-                V.append(dist)
-                I.append(point_1)
-                J.append(point_2)
-    
-                    # Takes all the IJV values and puts it into a sparse matrix.
-        spar_connections = sp.sparse.coo_matrix((np.array(V),(np.array(I),np.array(J))))
-        ind = np.where(spar_connections.data < min(spar_connections.data) + 0.001)
-        prelim_connections = np.array((spar_connections.row[ind],spar_connections.col[ind]))
-        connections = np.zeros((len(prelim_connections[0]),2),np.int)
-    
-        for i in range(len(prelim_connections[0])):
-            connections[i,0] = prelim_connections[0][i]
-            connections[i,1] = prelim_connections[1][i]
-    
-        b = np.ascontiguousarray(connections).view(np.dtype((np.void, connections.dtype.itemsize * connections.shape[1])))
-        _, idx = np.unique(b, return_index=True) # TAKEN FROM STACK OVERFLOW FOR THE TIME BEING.
-        connections = connections[idx]
-    
-        self._net.throat_properties['connections'] =  connections
-        self._net.throat_properties['numbering'] = np.arange(0,len(connections[:,0]))
-        self._net.throat_properties['type'] = np.zeros(len(connections[:,0]),dtype=np.int8)
+        Np  = self._net.get_num_pores()
+        adjmat = sprs.lil_matrix((Np,Np),dtype=int)
+        keep = list()
         
+        for i in np.arange(0,np.shape(tri.simplices)[0]):
+            adjmat[tri.simplices[i][tri.simplices[i]<Np],tri.simplices[i][tri.simplices[i]<Np]] = 1
+
+        adjmat = sprs.triu(adjmat,k=1,format="coo")
+        dist = pts[adjmat.row]-pts[adjmat.col]
+        for i in np.arange(0,len(dist)):
+            if np.sum(dist[i] != 0) == 1:
+                keep.append(i)
+            
+        connections = np.vstack((adjmat.row, adjmat.col)).T
+        connections = connections[keep]
+        self._net.throat_properties['connections'] = connections
+        self._net.throat_properties['type'] = np.zeros(len(connections))
+        self._net.throat_properties['numbering'] = np.arange(0,len(connections))        
         
+
     def _stitch_pores(self, net1, net2):
 
         self._net.pore_properties['coords']      = sp.concatenate((net1.pore_properties['coords'],net2.pore_properties['coords']),axis = 0)
