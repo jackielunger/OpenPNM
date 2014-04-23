@@ -15,13 +15,22 @@ geom.regenerate()
 #==============================================================================
 '''Build Fluids'''
 #==============================================================================
-air = OpenPNM.Fluids.Air(network=pn, loglevel=20)
-air.apply_conditions(temperature=350, pressure=200000)
-air.regenerate()
+air = pn.add_fluid('air')
+N2 = pn.add_fluid('N2')
+N2.apply_conditions(MW = 0.028)
+O2 = pn.add_fluid('O2')
+O2.apply_conditions(MW = 0.032)
+air.components = {}
+air.components['N2'] = N2
+air.components['O2'] = O2
+air.composition = {}
+air.composition['O2'] = 0.21
+air.composition['N2'] = 0.79
 
-water = OpenPNM.Fluids.Water(network=pn,loglevel=20)
-water.add_method(prop='diffusivity',prop_name='DAB',model='constant',value=5e-12)
-water.regenerate()
+air.add_method(prop='molar_mass',model='mixture')
+air.molar_mass()
+
+
 
 #==============================================================================
 '''Build Physics Objects'''
