@@ -97,6 +97,7 @@ class GenericGeometry(OpenPNM.Utilities.Base):
         r'''
         '''
         return self._net.throats(labels=self.name)
+        #return self._net.throats()
     
     def regenerate(self, prop_list='',mode=None):
         r'''

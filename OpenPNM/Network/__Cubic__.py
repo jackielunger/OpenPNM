@@ -42,6 +42,7 @@ class Cubic(GenericNetwork):
     >>> pn.generate(lattice_spacing=[1],divisions=[5,5,5],add_boundaries=False)
 
     """
+    
 
     def __init__(self, **kwargs):
         super(Cubic, self).__init__(**kwargs)

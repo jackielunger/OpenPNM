@@ -92,6 +92,8 @@ class FickianDiffusion(LinearSolver):
 
     def effective_diffusivity(self,
                               fluid,
+                              boundary_1 = [],
+                              boundary_2 = [],
                               direction='',                                                                               
                               conductance='diffusive_conductance',
                               occupancy='occupancy',
@@ -103,10 +105,20 @@ class FickianDiffusion(LinearSolver):
         face1 and face2 represent types of these two faces.
 
         """ 
-        return self._calc_eff_prop(alg='Fickian',
-                                  fluid=fluid,
-                                  direction=direction,
-                                  d_term=d_term,
-                                  x_term=x_term,
-                                  conductance=conductance,
-                                  occupancy=occupancy)
+        if (boundary_1 == [] and boundary_2 == []):
+            return self._calc_eff_prop(alg='Fickian',
+                                       fluid=fluid,
+                                       direction=direction,
+                                       d_term=d_term,
+                                       x_term=x_term,
+                                       conductance=conductance,
+                                       occupancy=occupancy)
+        else:
+            return self._calc_internal_eff_prop(alg='Fickian',
+                                                fluid=fluid,
+                                                boundary_1 = boundary_1,
+                                                boundary_2 = boundary_2,
+                                                d_term=d_term,
+                                                x_term=x_term,
+                                                conductance=conductance,
+                                                occupancy=occupancy)

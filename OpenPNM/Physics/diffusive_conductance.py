@@ -35,6 +35,7 @@ def bulk_diffusion(physics,
                    fluid,
                    geometry,
                    propname,
+                   shape = 'square',
                    diffusivity = 'diffusivity',
                    molar_density = 'molar_density',
                    throat_diameter = 'diameter',
@@ -74,6 +75,13 @@ def bulk_diffusion(physics,
     #Find g for full throat
     tdia = network.get_data(prop=throat_diameter,throats='all')
     tlen = network.get_data(prop=throat_length,throats='all')
+    if (shape == 'circular'):
+        gt = sp.pi*ct*DABt*tdia**2/(tlen*4)
+    elif (shape == 'square'):
+        gt = ct*DABt*tdia**2/tlen
+    else:
+        print 'invalid shape chosen.  Either circular or square'
+        return
     gt = ct*DABt*tdia**2/tlen
     value = (1/gt + 1/gp1 + 1/gp2)**(-1)
     value = value[geometry.throats()]
