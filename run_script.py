@@ -33,9 +33,9 @@ pn.regenerate_fluids()
 #==============================================================================
 '''Build Physics Objects'''
 #==============================================================================
-phys_water = OpenPNM.Physics.BasePhysics(network=pn, fluid=water,geometry=geom)
+phys_water = OpenPNM.Physics.BasePhysics(network=pn, fluid=water,geometry=geom,name='physwater')
 
-phys_air = OpenPNM.Physics.BasePhysics(network=pn, fluid=air,geometry=geom)
+phys_air = OpenPNM.Physics.BasePhysics(network=pn, fluid=air,geometry=geom,name='physair')
 
 #Use Network's Physics regeneration method
 pn.regenerate_physics()
@@ -72,7 +72,7 @@ Fickian_alg.update()
 '''Export to VTK'''
 #------------------------------------------------------------------------------
 #OpenPNM.Visualization.Vtp.write(filename='test.vtp',fluids=[air,water],network=pn)
-vis = OpenPNM.Visualization.Vtp_class()
+vis = OpenPNM.Visualization.VTK()
 vis.write(network=pn,fluids=[air,water])
 
 
