@@ -433,7 +433,7 @@ class LinearSolver(GenericAlgorithm):
             if face1=='front' or face1=='back': direct = 'X'
             elif face1=='left' or face1=='right': direct = 'Y'
             elif face1=='top' or face1=='bottom': direct = 'Z'
-            if 'boundary' in self._net._pore_info:
+            if 'pore.boundary' in self._net.keys():
                 face1_pores = network.get_pore_indices(labels=[face1,'boundary'],mode='intersection')
                 face2_pores = network.get_pore_indices(labels=[face2,'boundary'],mode='intersection')
             #else:

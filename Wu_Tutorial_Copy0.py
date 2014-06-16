@@ -1,15 +1,6 @@
 # -*- coding: utf-8 -*-
 # <nbformat>3.0</nbformat>
 
-# <codecell>
-
-cd NewPNM2
-
-# <codecell>
-
-ls
-
-# <codecell>
 
 import OpenPNM
 import matplotlib.pyplot as plt
@@ -55,11 +46,11 @@ throat_lengths = pn.get_throat_data(prop = 'length')
 pore_diameters = pn.get_pore_data(prop = 'diameter')
 pore_volumes = pn.get_pore_data(prop = 'volume')
 throat_volumes = pn.get_throat_data(prop = 'volume')
-print pore_diameters
-print throat_diameters
-print throat_lengths
-print throat_volumes
-print pore_volumes
+print(pore_diameters)
+print(throat_diameters)
+print(throat_lengths)
+print(throat_volumes)
+print(pore_volumes)
 
 # <codecell>
 
@@ -94,7 +85,7 @@ OP_1.update()
 
 # <codecell>
 
-OpenPNM.Visualization.Vtp.write(filename = 'wu.vtp', fluids = [air, water], network = pn)
+#OpenPNM.Visualization.VTK.write(network=pn,filename = 'wu.vtp', fluids = [air, water])
 
 # <codecell>
 
@@ -111,7 +102,7 @@ top_boundary = range(pn.num_pores() - pore_number, pn.num_pores() - pore_number 
 
 pn.set_pore_info(label = 'bound1', locations = bottom_boundary)
 pn.set_pore_info(label = 'bound2', locations = top_boundary)
-print pn.labels()
+print(pn.labels())
 
 # <codecell>
 
@@ -131,7 +122,7 @@ Fickian_alg.update()
 
 # <codecell>
 
-OpenPNM.Visualization.Vtp.write(filename='test.vtp',fluids=[air,water],network=pn)
+#OpenPNM.Visualization.Vtp.write(filename='test.vtp',fluids=[air,water],network=pn)
 
 # <codecell>
 
@@ -156,14 +147,14 @@ effective_diffusivity_Z = Fickian_alg.effective_diffusivity(fluid = air, boundar
 
 # <codecell>
 
-print effective_diffusivity_original
-print effective_diffusivity_original_X
-print effective_diffusivity_original_Y
-print effective_diffusivity_original_Z
-
-print effective_diffusivity_X
-print effective_diffusivity_Y
-print effective_diffusivity_Z
+#print effective_diffusivity_original
+#print effective_diffusivity_original_X
+#print effective_diffusivity_original_Y
+#print effective_diffusivity_original_Z
+#
+#print effective_diffusivity_X
+#print effective_diffusivity_Y
+#print effective_diffusivity_Z
 
 # <codecell>
 
@@ -176,7 +167,7 @@ effective_diffusivity_Z_mod = Fickian_alg.effective_diffusivity(fluid = air, bou
 
 bulk_diffusivity = air.get_pore_data(prop = 'diffusivity')
 normal_diffusivity = effective_diffusivity_Z/bulk_diffusivity
-print normal_diffusivity
+#print normal_diffusivity
 
 normal_diffusivity_mod = effective_diffusivity_Z_mod/bulk_diffusivity
 #print normal_diffusivity_mod
@@ -187,17 +178,17 @@ np.sum(water['throat.occupancy'][pn.find_neighbor_throats(pn.get_pore_indices(la
 
 # <codecell>
 
-print min(pn['pore.coords'][pn.find_neighbor_pores(pn.get_pore_indices(labels='bottom'))][2])
-print min(pn['pore.coords'][pn.get_pore_indices(labels='internal')][2])
+#print min(pn['pore.coords'][pn.find_neighbor_pores(pn.get_pore_indices(labels='bottom'))][2])
+#print min(pn['pore.coords'][pn.get_pore_indices(labels='internal')][2])
 
 # <codecell>
 
-print right_boundary
+#print right_boundary
 
 # <codecell>
 
 left_boundary = pn.get_pore_indices(labels = 'right')
-print left_boundary
+#print left_boundary
 
 # <codecell>
 
@@ -205,29 +196,29 @@ pore_1 = left_boundary[0]
 pore_2 = right_boundary[0]
 pore_1_coords = pn.get_pore_data(prop = 'coords', locations = pore_1)
 pore_2_coords = pn.get_pore_data(prop = 'coords', locations = pore_2)
-print pore_1_coords
-print pore_2_coords
+#print pore_1_coords
+#print pore_2_coords
 for i in range(3):
             if pore_1_coords[i]!= pore_2_coords[i]:
-                print "i: ", i
+#                print "i: ", i
                 break
 
 # <codecell>
 
-print left_boundary
-print [item + pn._Nx for item in left_boundary]
+#print left_boundary
+#print [item + pn._Nx for item in left_boundary]
 
 # <codecell>
 
-print effective_diffusivity_original
-print Fickian_alg.effective_diffusivity(fluid = air, direction = 'x') 
-print effective_diffusivity_X
-print effective_diffusivity_Y
-print effective_diffusivity_Z
+#print effective_diffusivity_original
+#print Fickian_alg.effective_diffusivity(fluid = air, direction = 'x') 
+#print effective_diffusivity_X
+#print effective_diffusivity_Y
+#print effective_diffusivity_Z
 
 # <codecell>
 
-print pn._Nx
+#print pn._Nx
 
 # <codecell>
 
@@ -235,9 +226,9 @@ Fickian_alg.get_pore_info(label = "Dirichlet", return_indices = True)
 
 # <codecell>
 
-print effective_diffusivity
-print bulk_diffusivity
-print normal_diffusivity
+#print effective_diffusivity
+#print bulk_diffusivity
+#print normal_diffusivity
 
 # <codecell>
 
@@ -253,11 +244,11 @@ pn._Lx
 
 # <codecell>
 
-print pn._Lc
+#print pn._Lc
 
 # <codecell>
 
-print pn._Lx/pn._Lc
+#print pn._Lx/pn._Lc
 
 # <codecell>
 
