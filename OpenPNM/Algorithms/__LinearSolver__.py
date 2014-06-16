@@ -436,9 +436,9 @@ class LinearSolver(GenericAlgorithm):
             if 'pore.boundary' in self._net.keys():
                 face1_pores = network.get_pore_indices(labels=[face1,'boundary'],mode='intersection')
                 face2_pores = network.get_pore_indices(labels=[face2,'boundary'],mode='intersection')
-            #else:
-            face1_pores = network.get_pore_indices(face1)
-            face2_pores = network.get_pore_indices(face2)
+            else:
+                face1_pores = network.get_pore_indices(face1)
+                face2_pores = network.get_pore_indices(face2)
             ## Assign Dirichlet boundary conditions
             ## BC1
             BC1_pores = face1_pores
