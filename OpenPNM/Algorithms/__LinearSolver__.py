@@ -281,9 +281,8 @@ class LinearSolver(GenericAlgorithm):
         Note:
         must enter boundary 1 and boundary 2 in ascending order (positive change in x, y, or z)
             """
-        print "running calc_internal_eff_prop"
+        
         network = self._net
-        result = 0
         try: fluid = self.find_object_by_name(fluid)
         except: pass
         if 'pore.Dirichlet' in self:
@@ -300,9 +299,42 @@ class LinearSolver(GenericAlgorithm):
             except: pass
         try: self._X_temp = self.get_pore_data(prop=self._X_name)
         except: pass
+        #network.set_info(label = 'boun1', pores = boundary_1)
         
         face_1_pores = boundary_1
         face_2_pores = boundary_2
+        
+        #Find L, A, and direction
+        pore_1 = face_1_pores[0]
+        pore_2 = face_2_pores[0]
+        
+        pore_1_coords = network.get_pore_data(prop = 'coords', locations = pore_1)
+        pore_2_coords = network.get_pore_data(prop = 'coords', locations = pore_2)
+    
+        for i in range(3):
+            if pore_1_coords[i]!= pore_2_coords[i]:
+                break
+        if i==0: #x is different
+            A = network.domain_size(dimension = 'front')
+        if i==1: #y is different
+            A = network.domain_size(dimension = 'left')
+        if i==2: #z is different
+            A = network.domain_size(dimension = 'top')
+        L = np.absolute(pore_1_coords[i] - pore_2_coords[i]) + network._Lc
+        #print("DOUBLING")
+        #L*=2 #making up for Wu's mistake temporarily
+        
+        network.set_info(pores = face_1_pores, label = 'boundary_1')
+        network.set_info(pores = face_2_pores, label = 'boundary_2')
+        if 'pore.boundary' in network.keys():
+            temp_face_1_pores = network.get_pore_indices(labels=['boundary_1','boundary'],mode='intersection')
+            if len(temp_face_1_pores) == int(A/network._Lc**2):
+                face_1_pores = temp_face_1_pores
+            temp_face_2_pores = network.get_pore_indices(labels=['boundary_2','boundary'],mode='intersection')
+            if len(temp_face_2_pores) == int(A/network._Lc**2):
+                face_2_pores = temp_face_2_pores
+        del network['pore.boundary_1']
+        del network['pore.boundary_2']
         
         #set Dirichlet boundaries
         self.set_boundary_conditions(bctype = 'Dirichlet', bcvalue = .6, pores = face_1_pores)
@@ -313,37 +345,44 @@ class LinearSolver(GenericAlgorithm):
                  conductance=conductance,
                  occupancy=occupancy)
         x = self.get_pore_data(prop=x_term)
+
+        #adding to fn and ft
+        fn = []
+        ft = []
+        new_face_1_pores = []
+        
+        #currently written to only work with flat surfaces
+        for pore in face_1_pores:
+            neighbors = network.find_neighbor_pores(pore, excl_self=True)
+            pore_coords = network.get_pore_data(prop = 'coords', locations = pore)
+            for neighbor in neighbors:
+                neighbor_coords = network.get_pore_data(prop = 'coords', locations = neighbor)
+                if neighbor_coords[i] > pore_coords[i] and neighbor not in face_1_pores:
+                    fn.append(neighbor)
+                    new_face_1_pores.append(pore)
+                    ft.append(network.find_connecting_throat(pore, neighbor)[0])
+
+        for pore in face_1_pores:
+            neighbors = network.find_neighbor_pores(pore, excl_self=True)
+            pore_coords = network.get_pore_data(prop = 'coords', locations = pore)
+            for neighbor in neighbors:
+                neighbor_coords = network.get_pore_data(prop = 'coords', locations = neighbor)
+                if neighbor_coords[i] == pore_coords[i] and neighbor in fn:
+                    fn.append(neighbor)
+                    new_face_1_pores.append(pore)
+                    ft.append(network.find_connecting_throat(pore, neighbor)[0])
+        
         if alg=='Fickian':
-            X1 = sp.log(1-x[face_1_pores])
+            X1 = sp.log(1-x[new_face_1_pores])
             X2 = sp.log(1-x[face_2_pores])
         elif alg=='Stokes':
-            X1 = x[face_1_pores]
+            X1 = x[new_face_1_pores]
             X2 = x[face_2_pores]
         delta_X = sp.absolute(sp.average(X2)-sp.average(X1))
         d_force =sp.average(fluid.get_pore_data(prop=d_term))
 
-        #Find L, A, and direction
-        pore_1 = face_1_pores[0]
-        pore_2 = face_2_pores[0]
-        pore_1_coords = network.get_pore_data(prop = 'coords', locations = pore_1)
-        pore_2_coords = network.get_pore_data(prop = 'coords', locations = pore_2)
-        for i in range(3):
-            if pore_1_coords[i]!= pore_2_coords[i]:
-                break
-        if i==0: #x is different
-            direction = 'X'
-            A = self._net.domain_size(dimension = 'front')
-            fn = [item+1 for item in face_1_pores]
-        if i==1: #y is different
-            direction = 'Y'
-            A = network.domain_size(dimension = 'left')
-            fn = [item+network._Nx for item in face_1_pores]
-        if i==2: #z is different
-            direction = 'Z'
-            A = self._net.domain_size(dimension = 'top')
-            fn = range(face_1_pores[len(face_1_pores)-1] + 1, face_1_pores[len(face_1_pores)-1] + 1 + len(face_1_pores))
-        L = np.absolute(pore_1_coords[i] - pore_2_coords[i]) + network._Lc
-        ft = network.find_connecting_throat(face_1_pores,fn)
+        network.set_info(pores = fn, label = 'fn')
+        
         if alg=='Fickian':
             X_temp = sp.log(1-x[fn])
         elif alg=='Stokes':
@@ -352,17 +391,12 @@ class LinearSolver(GenericAlgorithm):
         cond = self._conductance
         N = sp.sum(cond[ft]*sp.absolute(X1-X_temp))
         effective_prop = N*L/(d_force*A*delta_X)
-        #del self._pore_info['Dirichlet']
-        #del self._pore_data['BCval']
         del self['pore.Dirichlet']
-        #del self['BCval']
-        #delattr (self,'_BCtypes')
-        #delattr(self,'_BCvalues')
 
         try:
             self.set_pore_data(prop=self._X_name,data=self._X_temp)
             delattr (self,'_X_temp')
-        except : del self._pore_data[self._X_name]
+        except : pass #del self._pore_data[self._X_name]
         try:
             self.set_pore_info(label='Dirichlet',locations=self._dir,mode='overwrite')
             delattr (self,'_dir')
@@ -384,7 +418,6 @@ class LinearSolver(GenericAlgorithm):
                        occupancy,
                        direction,
                        **params):
-        
         network =self._net
         ftype1 = []
         ftype2 = []
@@ -427,18 +460,18 @@ class LinearSolver(GenericAlgorithm):
         except: pass          
         tensor = sp.zeros([3,3])
         for i in sp.r_[0:len(ftype1)]:
-            print "i: ", i
             face1 = ftype1[i] 
             face2 = ftype2[i]
             if face1=='front' or face1=='back': direct = 'X'
             elif face1=='left' or face1=='right': direct = 'Y'
             elif face1=='top' or face1=='bottom': direct = 'Z'
-            if 'boundary' in self._net._pore_info:
+            if 'pore.boundary' in network.keys():
                 face1_pores = network.get_pore_indices(labels=[face1,'boundary'],mode='intersection')
                 face2_pores = network.get_pore_indices(labels=[face2,'boundary'],mode='intersection')
-            #else:
-            face1_pores = network.get_pore_indices(face1)
-            face2_pores = network.get_pore_indices(face2)
+            else:
+                face1_pores = network.get_pore_indices(face1)
+                face2_pores = network.get_pore_indices(face2)
+                
             ## Assign Dirichlet boundary conditions
             ## BC1
             BC1_pores = face1_pores
@@ -446,14 +479,7 @@ class LinearSolver(GenericAlgorithm):
             
             self.set_boundary_conditions(bctype = 'Dirichlet', bcvalue = .6, pores = BC1_pores)
             self.set_boundary_conditions(bctype = 'Dirichlet', bcvalue = .2, pores = BC2_pores)
-            
-            #self.set_pore_info(label='Dirichlet',locations=BC1_pores,mode='overwrite')
-            #BC1_values = 0.8
-            #self.set_pore_data(prop='BCval',data=BC1_values,locations=BC1_pores)
-            ## BC2
-            #self.set_pore_info(label='Dirichlet',locations=BC2_pores)
-            #BC2_values = 0.4
-            #self.set_pore_data(prop='BCval',data=BC2_values,locations=BC2_pores)
+        
             self.run(active_fluid=fluid,
                            x_term=x_term,
                            conductance=conductance,
@@ -502,7 +528,7 @@ class LinearSolver(GenericAlgorithm):
         try:
             self.set_pore_data(prop=self._X_name,data=self._X_temp)
             delattr (self,'_X_temp')
-        except : del self._pore_data[self._X_name]
+        except : pass #del self._pore_data[self._X_name]
         try:
             self.set_pore_info(label='Dirichlet',locations=self._dir,mode='overwrite')
             delattr (self,'_dir')

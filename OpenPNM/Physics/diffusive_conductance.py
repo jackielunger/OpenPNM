@@ -80,7 +80,7 @@ def bulk_diffusion(physics,
     elif (shape == 'square'):
         gt = ct*DABt*tdia**2/tlen
     else:
-        print 'invalid shape chosen.  Either circular or square'
+        print('invalid shape chosen.  Either circular or square')
         return
     gt = ct*DABt*tdia**2/tlen
     value = (1/gt + 1/gp1 + 1/gp2)**(-1)
