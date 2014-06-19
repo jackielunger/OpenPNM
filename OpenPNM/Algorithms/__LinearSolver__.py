@@ -471,7 +471,7 @@ class LinearSolver(GenericAlgorithm):
             else:
                 face1_pores = network.get_pore_indices(face1)
                 face2_pores = network.get_pore_indices(face2)
-                
+
             ## Assign Dirichlet boundary conditions
             ## BC1
             BC1_pores = face1_pores
