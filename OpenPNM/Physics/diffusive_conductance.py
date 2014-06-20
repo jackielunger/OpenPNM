@@ -82,7 +82,6 @@ def bulk_diffusion(physics,
     else:
         print('invalid shape chosen.  Either circular or square')
         return
-    gt = ct*DABt*tdia**2/tlen
     value = (1/gt + 1/gp1 + 1/gp2)**(-1)
     value = value[geometry.throats()]
     fluid.set_data(prop=propname,throats=geometry.throats(),data=value)
