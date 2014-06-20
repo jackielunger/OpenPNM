@@ -62,9 +62,9 @@ def hagen_poiseuille(physics,
     #Find g for full throat
     tdia = network.get_throat_data(prop=throat_diameter)
     tlen = network.get_throat_data(prop=throat_length)
-    if shape = 'square':
+    if(shape == 'square'):
         gt = 2.28*(tdia/2)**4/(2*tlen*mut)
-    if shape = 'circular':
+    if(shape == 'circular'):
         print("correct equation not found yet")
         gt = 2.28*(tdia/2)**4/(2*tlen*mut)
     value = (1/gt + 1/gp1 + 1/gp2)**(-1)
