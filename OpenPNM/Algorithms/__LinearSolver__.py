@@ -278,8 +278,6 @@ class LinearSolver(GenericAlgorithm):
                                 **params):
         r"""
             calculates effective diffusivity given two internal boundaries.
-        Note:
-        must enter boundary 1 and boundary 2 in ascending order (positive change in x, y, or z)
             """
         
         network = self._net
@@ -299,12 +297,11 @@ class LinearSolver(GenericAlgorithm):
             except: pass
         try: self._X_temp = self.get_pore_data(prop=self._X_name)
         except: pass
-        #network.set_info(label = 'boun1', pores = boundary_1)
-        
+    
         face_1_pores = boundary_1
         face_2_pores = boundary_2
         
-        #Find L, A, and direction
+        #Finding A
         pore_1 = face_1_pores[0]
         pore_2 = face_2_pores[0]
         
@@ -320,9 +317,26 @@ class LinearSolver(GenericAlgorithm):
             A = network.domain_size(dimension = 'left')
         if i==2: #z is different
             A = network.domain_size(dimension = 'top')
-        L = np.absolute(pore_1_coords[i] - pore_2_coords[i]) + network._Lc
-        #print("DOUBLING")
-        #L*=2 #making up for Wu's mistake temporarily
+         
+        #finding L using average i-coordinate difference
+        sum_i_coord_boundary_1 = 0
+        average_i_coord_boundary_1 = 0
+        for pore in face_1_pores:
+            pore_coords = network.get_pore_data(prop = 'coords', locations = pore)
+            sum_i_coord_boundary_1 += pore_coords[i]
+        average_i_coord_boundary_1 = sum_i_coord_boundary_1/len(face_1_pores)
+        
+        sum_i_coord_boundary_2 = 0
+        average_i_coord_boundary_2 = 0
+        for pore in face_2_pores:
+            pore_coords = network.get_pore_data(prop = 'coords', locations = pore)
+            sum_i_coord_boundary_2 += pore_coords[i]
+        average_i_coord_boundary_2 = sum_i_coord_boundary_2/len(face_2_pores)
+            
+        
+        L = sp.absolute(average_i_coord_boundary_2 - average_i_coord_boundary_1) + network._Lc
+        #print("Doubling L (making same mistake as Wu to mimick results)")   
+        #L*=2 
         
         network.set_info(pores = face_1_pores, label = 'boundary_1')
         network.set_info(pores = face_2_pores, label = 'boundary_2')
@@ -350,46 +364,36 @@ class LinearSolver(GenericAlgorithm):
         fn = []
         ft = []
         new_face_1_pores = []
-        
-        #currently written to only work with flat surfaces
         for pore in face_1_pores:
+            if alg == 'Fickian': pore_concentration = sp.log(1-x[pore])
+            elif alg == 'Stokes': pore_concentration = x[pore]
             neighbors = network.find_neighbor_pores(pore, excl_self=True)
-            pore_coords = network.get_pore_data(prop = 'coords', locations = pore)
             for neighbor in neighbors:
-                neighbor_coords = network.get_pore_data(prop = 'coords', locations = neighbor)
-                if neighbor_coords[i] > pore_coords[i] and neighbor not in face_1_pores:
+                if alg == 'Fickian': neighbor_concentration = sp.log(1-x[neighbor])
+                elif alg == 'Stokes': neighbor_concentration = x[neighbor]
+                if (sp.absolute(neighbor_concentration - pore_concentration) > .000001):
                     fn.append(neighbor)
                     new_face_1_pores.append(pore)
                     ft.append(network.find_connecting_throat(pore, neighbor)[0])
-
-        for pore in face_1_pores:
-            neighbors = network.find_neighbor_pores(pore, excl_self=True)
-            pore_coords = network.get_pore_data(prop = 'coords', locations = pore)
-            for neighbor in neighbors:
-                neighbor_coords = network.get_pore_data(prop = 'coords', locations = neighbor)
-                if neighbor_coords[i] == pore_coords[i] and neighbor in fn:
-                    fn.append(neighbor)
-                    new_face_1_pores.append(pore)
-                    ft.append(network.find_connecting_throat(pore, neighbor)[0])
-        
+                    
         if alg=='Fickian':
-            X1 = sp.log(1-x[new_face_1_pores])
+            X1 = sp.log(1-x[face_1_pores])
             X2 = sp.log(1-x[face_2_pores])
         elif alg=='Stokes':
-            X1 = x[new_face_1_pores]
+            X1 = x[face_1_pores]
             X2 = x[face_2_pores]
         delta_X = sp.absolute(sp.average(X2)-sp.average(X1))
         d_force =sp.average(fluid.get_pore_data(prop=d_term))
 
-        network.set_info(pores = fn, label = 'fn')
-        
         if alg=='Fickian':
             X_temp = sp.log(1-x[fn])
+            X_bound_1 = sp.log(1-x[new_face_1_pores])
         elif alg=='Stokes':
             X_temp = x[fn]
+            X_bound_1 = x[new_face_1_pores]
             d_force = 1/d_force
         cond = self._conductance
-        N = sp.sum(cond[ft]*sp.absolute(X1-X_temp))
+        N = sp.sum(cond[ft]*sp.absolute(X_bound_1-X_temp))
         effective_prop = N*L/(d_force*A*delta_X)
         del self['pore.Dirichlet']
 
