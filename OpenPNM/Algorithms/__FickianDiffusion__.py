@@ -75,8 +75,7 @@ class FickianDiffusion(LinearSolver):
         
         
         X = self._do_one_inner_iteration()
-#        xA = 1-sp.exp(X)        
-        xA = X        
+        xA = 1-sp.exp(X)       
         self.set_pore_data(prop=self._X_name,data = xA)
         self._logger.info('Solving process finished successfully!')
         try:

@@ -74,7 +74,6 @@ This module contains methods for estimating fluid properties
 from .__GenericFluid__ import GenericFluid
 from .__Water__ import Water
 from .__Air__ import Air
-from .__Air__ import AirWu
 from . import viscosity
 from . import molar_density
 from . import molar_mass
