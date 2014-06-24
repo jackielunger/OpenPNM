@@ -82,7 +82,22 @@ def bulk_diffusion(physics,
     else:
         print('invalid shape chosen.  Either circular or square')
         return
-    value = (1/gt + 1/gp1 + 1/gp2)**(-1)
+    value = (1/gt + 1/gp1 + 1/gp2)**(-1) 
     value = value[geometry.throats()]
+    #check for occupancy of connected pores
+    try: 
+        fluid['pore.occupancy']
+        connected_pores = network.find_connected_pores(fluid.throats())
+        s = []
+        for item in connected_pores:
+            s_item = False
+            for pore in item:
+                if(fluid.get_pore_data(prop = 'occupancy', locations = pore)):
+                    s_item = True
+            s.append(s_item)
+        
+        for x in range(len(value)):
+            value[x] = value[x] * s[x] + value[x]*(not s[x])/1e3
+    except: pass    
     fluid.set_data(prop=propname,throats=geometry.throats(),data=value)
 

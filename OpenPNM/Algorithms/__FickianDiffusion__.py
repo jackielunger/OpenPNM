@@ -61,9 +61,9 @@ class FickianDiffusion(LinearSolver):
             self._fluid.set_data(prop=occupancy,pores='all',data=1)
             self._logger.info('By default, it will be assumed that occupancy for '+self._fluid.name+' is equal to 1 in the entire network!')
         if success_2:    
-            g = self._fluid.get_throat_data(prop=diffusive_conductance)
-            s = self._fluid.get_throat_data(prop=occupancy)
-            self._conductance = g*s+g*(-s)/1e3
+            for physics in self._fluid._physics:
+                physics.regenerate("diffusive_conductance")
+            self._conductance = self._fluid.get_throat_data(prop = diffusive_conductance)
             setup_conductance = True
         try:    setup_conductance
         except: raise Exception('There is an error for the throat property: '+diffusive_conductance+'!')
@@ -75,7 +75,7 @@ class FickianDiffusion(LinearSolver):
         
         
         X = self._do_one_inner_iteration()
-        xA = 1-sp.exp(X)       
+        xA = 1-sp.exp(X)        
         self.set_pore_data(prop=self._X_name,data = xA)
         self._logger.info('Solving process finished successfully!')
         try:

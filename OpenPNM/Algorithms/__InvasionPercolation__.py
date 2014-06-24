@@ -610,7 +610,7 @@ class InvasionPercolation(GenericAlgorithm):
         r"""
         """
         if IPseq=='None':
-            IPseq = self._tseq
+            IPseq = self._pseq
 
         try:
             self._fluid.set_pore_data(prop=occupancy,data=((self._psequence>0)&(self._psequence<=IPseq)))
