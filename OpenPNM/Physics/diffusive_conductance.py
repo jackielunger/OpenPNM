@@ -73,8 +73,8 @@ def bulk_diffusion(physics,
     gp2 = ct*DABt*pdia[Ps[:,1]]**2/(0.5*pdia[Ps[:,1]])
     gp2[~(gp2>0)] = sp.inf #Set 0 conductance pores (boundaries) to inf
     #Find g for full throat
-    tdia = network.get_data(prop=throat_diameter,throats='all')
-    tlen = network.get_data(prop=throat_length,throats='all')
+    tdia = network['throat.diameter']
+    tlen = network['throat.length']
     if (shape == 'circular'):
         gt = sp.pi*ct*DABt*tdia**2/(tlen*4)
     elif (shape == 'square'):
@@ -82,8 +82,8 @@ def bulk_diffusion(physics,
     else:
         print('invalid shape chosen.  Either circular or square')
         return
-    value = (1/gt + 1/gp1 + 1/gp2)**(-1) 
-    value = value[geometry.throats()]
+    g = (1/gt + 1/gp1 + 1/gp2)**(-1) 
+    g = g[geometry.throats()]
     #check for occupancy of connected pores
     try: 
         fluid['pore.occupancy']
@@ -92,12 +92,11 @@ def bulk_diffusion(physics,
         for item in connected_pores:
             s_item = False
             for pore in item:
-                if(fluid.get_pore_data(prop = 'occupancy', locations = pore)):
+                if fluid['pore.occupancy'][pore]:
                     s_item = True
             s.append(s_item)
-        
-        for x in range(len(value)):
-            value[x] = value[x] * s[x] + value[x]*(not s[x])/1e3
+        s=sp.array(s)
+        g = g * s + g*(not s)/1.0e3
     except: pass    
-    fluid.set_data(prop=propname,throats=geometry.throats(),data=value)
+    fluid['throat.'+propname] = g
 
