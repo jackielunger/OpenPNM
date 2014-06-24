@@ -60,9 +60,13 @@ class FickianDiffusion(LinearSolver):
             self._fluid.set_data(prop=occupancy,throats='all',data=1)
             self._fluid.set_data(prop=occupancy,pores='all',data=1)
             self._logger.info('By default, it will be assumed that occupancy for '+self._fluid.name+' is equal to 1 in the entire network!')
-        if success_2:    
-            for physics in self._fluid._physics:
-                physics.regenerate(diffusive_conductance)
+        if success_2:
+            try:
+                for physics in self._fluid._physics:
+                    physics.regenerate(diffusive_conductance)
+            except:
+                print(could not regenerate diffusive_conductance)
+                self._net.regenerate_physics()
             self._conductance = self._fluid.get_throat_data(prop = diffusive_conductance)
             setup_conductance = True
         try:    setup_conductance
