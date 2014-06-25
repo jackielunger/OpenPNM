@@ -369,7 +369,7 @@ class LinearSolver(GenericAlgorithm):
             elif alg == 'Stokes': pore_concentration = x[pore]
             neighbors = network.find_neighbor_pores(pore, excl_self=True)
             for neighbor in neighbors:
-                if alg == 'Fickian': neighbor_concentration = sp.log(1-x[neighbor])
+                if alg == 'Fickian': neighbor_concentration = x[neighbor]
                 elif alg == 'Stokes': neighbor_concentration = x[neighbor]
                 if (sp.absolute(neighbor_concentration - pore_concentration) > .000001):
                     fn.append(neighbor)

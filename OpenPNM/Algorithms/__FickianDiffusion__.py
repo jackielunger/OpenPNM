@@ -65,7 +65,7 @@ class FickianDiffusion(LinearSolver):
                 for physics in self._fluid._physics:
                     physics.regenerate(diffusive_conductance)
             except:
-                print(could not regenerate diffusive_conductance)
+                print("could not regenerate diffusive_conductance")
                 self._net.regenerate_physics()
             self._conductance = self._fluid.get_throat_data(prop = diffusive_conductance)
             setup_conductance = True
