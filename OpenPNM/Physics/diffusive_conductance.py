@@ -96,7 +96,7 @@ def bulk_diffusion(physics,
                     s_item = True
             s.append(s_item)
         s=sp.array(s)
-        g = g * s + g*(not s)/1.0e3
+        g = g * s + g*(-s)/1.0e3
     except: pass    
     fluid['throat.'+propname] = g
 
