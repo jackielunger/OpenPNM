@@ -115,7 +115,7 @@ pn.regenerate_fluids()
 # 
 # Before we add methods to our physics objects, we should write a method for calculating diffusive conductance that follows Wu's model.  This will not be encorporated into OpenPNM, but can still be used to calculate our diffusive_conductance.  We will call this bulk_diffusion_wu, and it will appear as follows:
 
-# In[8]:
+# In[3]:
 
 import scipy as sp
 
@@ -154,7 +154,8 @@ def bulk_diffusion_wu(physics,
     tdia = network.get_throat_data(prop=throat_diameter)
     tlen = network.get_throat_data(prop=throat_length)
     gt = (sp.pi*DABt*tdia**2)/(tlen*4)
-    value = gt[geometry.throats()]
+    g = gt[geometry.throats()]
+    #check for occupancy of connected pores
     try: 
         fluid['pore.occupancy']
         connected_pores = network.find_connected_pores(fluid.throats())
@@ -162,14 +163,13 @@ def bulk_diffusion_wu(physics,
         for item in connected_pores:
             s_item = False
             for pore in item:
-                if(fluid.get_pore_data(prop = 'occupancy', locations = pore)):
+                if fluid['pore.occupancy'][pore]:
                     s_item = True
             s.append(s_item)
-        
-        for x in range(len(value)):
-            value[x] = value[x] * s[x] + value[x]*(not s[x])/1e3
+        s=sp.array(s)
+        g = g * s + g*(-s)/1e3
     except: pass    
-    fluid.set_data(prop=propname,throats=geometry.throats(),data=value)
+    fluid.set_data(prop=propname,throats=geometry.throats(),data=g)
 
 
 # The code within the try statement is important for after invasion percolation is run and some pores and throats are occupied by invading fluid.  If both neighboring pores of a throat are filled with water, then the conductance in the throat must be set to a much smaller value.  
@@ -181,7 +181,7 @@ def bulk_diffusion_wu(physics,
 phys_water = OpenPNM.Physics.GenericPhysics(network=pn,fluid=water, geometry = geo, name='standard_water_physics')
 phys_air = OpenPNM.Physics.GenericPhysics(network=pn,fluid=air, geometry = geo, name='standard_air_physics')
 
-phys_water.add_method(prop='capillary_pressure', model='purcell', r_toroid=1e-5)
+phys_water.add_method(prop='capillary_pressure', model='washburn') #accounts for cylindrical throats
 phys_water.add_method(prop='hydraulic_conductance',model='hagen_poiseuille')
 phys_water.add_method(prop='diffusive_conductance', model='bulk_diffusion', shape = 'circular')
 phys_air.add_method(prop='hydraulic_conductance',model='hagen_poiseuille')
@@ -214,7 +214,7 @@ vis.write(filename = 'test.vtp', network=pn,fluids=[air,water])
 
 # If all has gone well, we should be able to watch the invasion percolation take place by opening our vtk file in ParaView.  After adding a threshold, we can watch an animation of the invasion that will appear as follows:
 
-# In[11]:
+# In[2]:
 
 from IPython.display import YouTubeVideo
 display(YouTubeVideo('0iSuypRaT7A'))
@@ -297,9 +297,9 @@ print(saturation)
 
 # If we want to run many simulations in a row, it makes more sense to put all the code generated so far into one function.  We can call this function run_simulation(...), and give it n, low, high, and end_condition as paramaters (remember that n helps with the size of the network, low and high give the min and max throat radii values, and end_condition determines when we want invasion percolation to terminate).
 
-# In[17]:
+# In[5]:
 
-def run_simulation(n, low, high):
+def run_simulation(n, low, high, run_dry = False):
     
     Lc = 25e-6
     n = n
@@ -328,13 +328,17 @@ def run_simulation(n, low, high):
     
     phys_water = OpenPNM.Physics.GenericPhysics(network=pn,fluid=water, geometry = geo, name='standard_water_physics')
     phys_air = OpenPNM.Physics.GenericPhysics(network=pn,fluid=air, geometry = geo, name='standard_air_physics')
-    phys_water.add_method(prop='capillary_pressure', model='purcell', r_toroid=1e-5)
+    phys_water.add_method(prop='capillary_pressure', model='washburn')
     phys_water.add_method(prop='hydraulic_conductance',model='hagen_poiseuille')
     phys_water.add_method(prop='diffusive_conductance', model='bulk_diffusion', shape = 'circular')
     phys_air.add_method(prop='hydraulic_conductance',model='hagen_poiseuille')
-
+    #phys_air.add_method(prop='diffusive_conductance',model='bulk_diffusion')
     bulk_diffusion_wu(physics = phys_air, network = pn, fluid = air, geometry = geo, propname = 'diffusive_conductance')
-    pn.regenerate_physics()
+    phys_water.capillary_pressure()
+    phys_water.hydraulic_conductance()
+    phys_water.diffusive_conductance()
+    phys_air.hydraulic_conductance()
+    
     inlets = [pn.get_pore_indices(labels = ['bottom'])]
     outlets = pn.get_pore_indices(labels = ['top'])
    
@@ -345,8 +349,13 @@ def run_simulation(n, low, high):
     OP_1 = OpenPNM.Algorithms.InvasionPercolation(network = pn, name = 'OP_1',loglevel=30)
     OP_1.run(invading_fluid = water, defending_fluid = air, inlets = inlets, outlets = outlets, end_condition = end_condition)
     OP_1.update()
-    #OP_1.update(IPseq = 0)
+    
+    if(run_dry == True):
+        OP_1.update(IPseq = 0)
     Fickian_alg = OpenPNM.Algorithms.FickianDiffusion(loggername = 'Fickian', name = 'fickian_alg', network = pn)
+    
+    #must be recalculated after invasion percolation runs
+    bulk_diffusion_wu(physics = phys_air, network = pn, fluid = air, geometry = geo, propname = 'diffusive_conductance')
     
     #set labels for top boundary
     #set labels for bottom boundary
@@ -385,14 +394,14 @@ def run_simulation(n, low, high):
 
 # It is helpful to save the results generated for each simulation inside a data file so that we can see the progress as the simulation runs.  We can write a saving_simulation_data() function for this.  At the same time, we can pass a variable to define the number of times we want to run a particular kind of simulation, and have saving_simulation_data() save data for multiple runs.  In addition to being written to a file, the data should also be saved into x_values and y_values arrays, to make it easy to graph later.
 
-# In[18]:
+# In[6]:
 
-def saving_simulation_data(n, low, high, number_times_run, x_values, y_values):
+def saving_simulation_data(n, low, high, number_times_run, x_values, y_values, run_dry = False):
     x_values = x_values
     y_values = y_values
     
     for x in range(number_times_run):
-        data = run_simulation(n, low, high)
+        data = run_simulation(n, low, high, run_dry = run_dry)
         x_values.append(data[0])
         y_values.append(data[1])
         
@@ -415,19 +424,19 @@ def saving_simulation_data(n, low, high, number_times_run, x_values, y_values):
 # 
 # Note that the more simulations that are run, the longer this process will take.  To adequately regenerate Wu's data, we would want to run each of these different end_condition simulations upwards of 20 times.  For the sake of saving time, we can run each only 2 times to generate a graph that shows the trend.  With number_times_run for each of the lines below at 2, the simulation will still take a few minutes.  The progress of the simulations can be watched inside the file that the data is being saved to.
 
-# In[19]:
+# In[7]:
 
 x_values1 = []
 y_values1 = []
 
-saving_simulation_data(n = 14, low = .5e-6, high = 9.5e-6, number_times_run = 1, x_values = x_values1, y_values = y_values1)
+saving_simulation_data(n = 14, low = .5e-6, high = 9.5e-6, number_times_run = 20, x_values = x_values1, y_values = y_values1)
 
 
 # the data now has x values saved to x_values and y values saved to y_values.  We've already imported matplotlib.pyplot, so only a few lines of code are needed to generate a graph of the data.  
 # 
 # One thing to note is that when using IPython notebook, installed with anaconda, using matplotlib will
 
-# In[ ]:
+# In[8]:
 
 plt.plot(x_values1, y_values1, 'ro')
 plt.title('saturation versus normalized diffusivity')
@@ -438,43 +447,41 @@ plt.show()
 
 # The graph generated thus far should look something like this:
 
-# In[21]:
+# In[3]:
 
-i = Image(url = 'http://i.imgur.com/TEzhh27.png')
+i = Image(url = 'http://i.imgur.com/CbuVrur.png')
 display(i)
 
-#IMPORTANT NOTE!!! DISPLAYED GRAPH IS OUT OF DATE
 
+### Generating a graph of N (network size parameter) versus f(epsilon)
 
-### Generating a graph of N (network parameter) versus f(epsilon)
-
-# Wu's second graph shows how N affects f(epsilon).  f(epsilon) is the same as normalized diffusivity when saturation is 0, so we can run many tests that don't allow percolation to run. After running many trials, we will have x_values and y_values saved.  we want to use the values that N takes as our x_values, so we must also generate n_values to make graphing possible.
+# Wu's second graph shows how N affects f(epsilon).  f(epsilon) is the same as normalized diffusivity when saturation is 0, so we can run many tests on dry networks. After running many trials, we will have x_values and y_values saved.  we want to use the values that N takes as our x_values, so we must also generate n_values to make graphing possible.
 # 
 # Again, processing this information will take longer if x is higher.  We can run simulations with x = 2 that will run much faster, but generate much less data.  Running with x = 5 will take just a few minutes at most.
 
-# In[22]:
+# In[15]:
 
 x_values = []
 y_values = []
 n_values = []
 
 x = 5
-saving_simulation_data(n = 8, low = .5e-6, high = 9.5e-6, end_condition = 0, number_times_run = x, x_values = x_values, y_values = y_values)
+saving_simulation_data(n = 8, low = .5e-6, high = 9.5e-6, run_dry = True, number_times_run = x, x_values = x_values, y_values = y_values)
 for i in range(x):
     n_values.append(8)
-saving_simulation_data(n = 10, low = .5e-6, high = 9.5e-6, end_condition = 0, number_times_run = x, x_values = x_values, y_values = y_values)
+saving_simulation_data(n = 10, low = .5e-6, high = 9.5e-6, run_dry = True, number_times_run = x, x_values = x_values, y_values = y_values)
 for i in range(x):
     n_values.append(10)
-saving_simulation_data(n = 12, low = .5e-6, high = 9.5e-6, end_condition = 0, number_times_run = x, x_values = x_values, y_values = y_values)
+saving_simulation_data(n = 12, low = .5e-6, high = 9.5e-6, run_dry = True, number_times_run = x, x_values = x_values, y_values = y_values)
 for i in range(x):
     n_values.append(12)
-saving_simulation_data(n = 14, low = .5e-6, high = 9.5e-6, end_condition = 0, number_times_run = x, x_values = x_values, y_values = y_values)
+saving_simulation_data(n = 14, low = .5e-6, high = 9.5e-6, run_dry = True, number_times_run = x, x_values = x_values, y_values = y_values)
 for i in range(x):
     n_values.append(14)
-saving_simulation_data(n = 16, low = .5e-6, high = 9.5e-6, end_condition = 0, number_times_run = x, x_values = x_values, y_values = y_values)
+saving_simulation_data(n = 16, low = .5e-6, high = 9.5e-6, run_dry = True, number_times_run = x, x_values = x_values, y_values = y_values)
 for i in range(x):
     n_values.append(16)
-saving_simulation_data(n = 20, low = .5e-6, high = 9.5e-6, end_condition = 0, number_times_run = x, x_values = x_values, y_values = y_values)
+saving_simulation_data(n = 20, low = .5e-6, high = 9.5e-6, run_dry = True, number_times_run = x, x_values = x_values, y_values = y_values)
 for i in range(x):
     n_values.append(20)
 
@@ -483,31 +490,29 @@ for i in range(x):
 # 
 # The plot axis have been adjusted to make it more obvious that F(epsilon) barely changes with N.  
 
-# In[27]:
+# In[16]:
 
 plt.plot(n_values, y_values, 'ro')
 plt.title('N versus F(epsilon)')
 plt.xlabel('N')
 plt.ylabel('F(epsilon)')
-plt.axis([6, 22, .12, .2])
+plt.axis([6, 22, .06, .1])
 plt.show()
 
 
 # This graph should match the one below:
 
-# In[28]:
+# In[19]:
 
-i = Image(url = 'http://i.imgur.com/2GZNumh.png')
+i = Image(url = 'http://i.imgur.com/X0oKL3j.png')
 display(i)
-
-#IMPORTANT NOTE! GRAPH IS OUT OF DATE!
 
 
 ### Generating a graph of saturation versus g(s)
 
 # Wu's third graph plots saturation versus g(s).  g(s)f(epsilon) = normalized_diffusivity, so g(s) = normalized_diffusivity/f(epsilon).  Because we are not varying the set up of our network, f(epsilon) will be constant.  Luckily, our second graph calculates this value many times for us.  We should use the average of this value in our calculation of g(s).  Lastly, we can graph g(s) using our x_values1 from our first graph, and our g(s) values calculated from our y_values1 and average f(epsilon).    
 
-# In[30]:
+# In[28]:
 
 #find average value for f(epsilon)
 sum = 0
@@ -519,7 +524,7 @@ average_f = sum/count
 
 #prints graph for g(s) 
 
-g_values = range(len(y_values1))
+g_values = list(range(len(y_values1)))
 
 for x in range(len(y_values1)):
     g_values[x] = y_values1[x]/average_f
@@ -527,31 +532,28 @@ plt.plot(x_values1, g_values, 'ro')
 plt.title('saturation versus g(s)')
 plt.xlabel('saturation')
 plt.ylabel('g(s)')
-plt.axis([0, 1, 0, 1])
+plt.axis([0, .7, 0, 1])
 plt.show()
 
 
 # The graph generated should mimic the one below:
 
-# In[31]:
+# In[29]:
 
-i = Image(url = 'http://i.imgur.com/zKtC73T.png')
+i = Image(url = 'http://i.imgur.com/YMTmKQ1.png')
 display(i)
-
-#IMPORTANT NOTE: GRAPH IS OUT OF DATE!
 
 
 ### Generating a graph of saturation versus alpha
 
-# Finally, we want to print a graph of saturation versus alpha.  This gives us an idea of the equation for g(s) (g(s) = (1-s)^alpha).  
+# Finally, we want to print a graph of saturation versus alpha.  This gives us an idea of the equation for g(s) (g(s) = (1-s)^alpha).  The following prints an alpha value for every data point we have gathered.  Wu et al find alpha by using a best fit curve, but this simplification is enough to show that we have alpha values close to those Wu generated.  
 
-# In[32]:
+# In[31]:
 
 alpha = []
 for x in range(len(g_values)):
     alpha_value = np.log(g_values[x])/np.log(1 - x_values1[x])
     alpha.append(alpha_value)
-    
 plt.plot(x_values1, alpha, 'ro')
 plt.title('alpha versus saturation')
 plt.xlabel('saturation')
@@ -562,20 +564,18 @@ plt.show()
 
 # The graph generated should look something like this:
 
-# In[33]:
+# In[32]:
 
-i = Image(url = 'http://i.imgur.com/seAiSwe.png')
+i = Image(url = 'http://i.imgur.com/6HHbcBP.png')
 display(i)
 
-#IMPORTANT NOTE! GRAPH IS OUT OF DATE!
 
+### Discrepencies between our data and Wu's data
 
-### Explaining discrepencies with Wu's data
-
-# The numbers generated in this tutorial do not perfectly match the numbers generated by Wu et al.  There are several reasons for this.
+# Our values aren't quite the same as those generated by Wu et al.  there are several reasons for this-
 # 
-# First, Wu et al use slightly different physics for calculating effective diffusivity.  While OpenPNM assumes a binary fluid system (oxygen in air), Wu does not.  It is impossible to code in Wu's physics equations without changing OpenPNM, and it is preferred that OpenPNM maintain only a binary fluid phyics way of calculating of effective diffusivity. 
+# 1) the effective diffusivity calculations done by OpenPNM assume a binary system.  Our code finds diffusion of oxygen through nitrogen, while Wu et al find diffusion for oxygen alone.  Being able to completely copy Wu's equations would require much editing to OpenPNM, and it has been decided that maintaining only a binary system way of calculating effective diffusivity is preferable.
 # 
-# Second, we do not know what bulk diffusivity Wu uses, so we cannot be sure that the value we have chosen best mimics his test.  Likewise, we are not sure what temperature Wu is running his simulations at, and have assumed the system to be at 273 K.
+# 2) There are some assumptions that had to be made that we cannot be sure matched perfectly with Wu's assumptions.  One example of this is temperature.  We have assumed the oxygen Wu was running through the network was at 273 degrees Kelvin, but we cannot be certain that this is the value he was using.
 # 
-# 
+# 3) There are some slight calculation differences Wu uses because his throats are circular instead of square in cross-section and his pores are spherical instead of cubic.  This mostly effects fluid dynamics calculations including diffusive conductance, hydraulic conductance, and capillary pressure.
