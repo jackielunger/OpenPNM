@@ -23,17 +23,16 @@ def uniform_distribution(geometry,
                          propname,
                          low = 4,
                          high = 6,
+                         seed = None,
                          **params):
     
     r"""
         Assigns a uniform distribution of values
         """
-    throats = network.get_throat_indices()
-    for throat in throats: #loops through all throats and sets the throat a random radius (between high and low)
-        lamd = rd.random()
-        radius = low + lamd*(high - low)
-        diameter = 2*radius
-        network.set_throat_data(prop = propname, data = diameter, locations = throat)
+    sp.random.seed(seed)
+    Np = network.num_throats(geometry.name)
+    value = low + sp.random.rand(Np)*(high-low) 
+    network.set_data(prop=propname,throats=geometry.throats(),data=value)
 
 
 def cylinder(geometry,

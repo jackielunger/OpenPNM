@@ -17,6 +17,23 @@ def constant(geometry,
     Assign specified constant value
     """
     network.set_data(prop=propname,pores=geometry.pores(),data=value)
+    
+def weibull_cumulative(geometry,
+                       network,
+                       propname,
+                       xmax,
+                       bmin,
+                       lmbda,
+                       k,
+                       seed = None,
+                       **params):
+    r"""
+    Calculate pore diameter using a weibull cumulative distribution
+    """
+    sp.random.seed(seed)
+    Np = network.num_pores(geometry.name)
+    value = lmbda*(-sp.log(1-sp.random.rand(Np)*xmax))**(-1/k) + bmin 
+    network.set_data(prop=propname,pores=geometry.pores(),data=value)
 
 def sphere(geometry,
            network,
