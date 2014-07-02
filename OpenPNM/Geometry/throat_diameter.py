@@ -34,6 +34,20 @@ def uniform_distribution(geometry,
     value = low + sp.random.rand(Np)*(high-low) 
     network.set_data(prop=propname,throats=geometry.throats(),data=value)
 
+def smaller_connecting_pore(geometry,
+                            network,
+                            propname,
+                            **params):
+
+    r"""
+    sets diameter to that of the smaller neighbor pore
+    """
+    
+    connected_pores = network.find_connected_pores(geometry.throats())
+    value = []
+    for pair in connected_pores:
+        value.append(min(network.get_data(pores =pair[0], prop = propname), network.get_data(pores =pair[1], prop = propname)))
+    network.set_data(prop = propname, throats = geometry.throats(), data = value)   
 
 def cylinder(geometry,
              network,

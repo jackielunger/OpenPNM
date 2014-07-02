@@ -32,7 +32,7 @@ def weibull_cumulative(geometry,
     """
     sp.random.seed(seed)
     Np = network.num_pores(geometry.name)
-    value = lmbda*(-sp.log(1-sp.random.rand(Np)*xmax))**(-1/k) + bmin 
+    value = lmbda*(-sp.log(1-sp.random.rand(Np)*xmax))**(-1/k) + bmin
     network.set_data(prop=propname,pores=geometry.pores(),data=value)
 
 def sphere(geometry,
